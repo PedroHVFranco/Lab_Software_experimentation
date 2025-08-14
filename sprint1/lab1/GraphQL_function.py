@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import os, json, csv, time, datetime, pathlib, urllib.request, urllib.error, random
 
 API = "https://api.github.com/graphql"
