@@ -1,0 +1,29 @@
+query TopStarredRepos($after: String, $pageSize: Int!) {
+  rateLimit { cost remaining resetAt }
+  search(
+    query: "stars:>0 is:public fork:false sort:stars"
+    type: REPOSITORY
+    first: $pageSize
+    after: $after
+  ) {
+    repositoryCount
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      ... on Repository {
+        id
+        name
+        owner { login }
+        url
+        stargazerCount
+        createdAt
+        updatedAt
+        pushedAt
+        releases { totalCount }
+        pullRequests(states: MERGED) { totalCount }
+        issues { totalCount }
+        closedIssues: issues(states: CLOSED) { totalCount }
+        primaryLanguage { name }
+      }
+    }
+  }
+}
