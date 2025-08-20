@@ -106,7 +106,7 @@ def save_csv(rows, path: pathlib.Path):
         w = csv.DictWriter(f, fieldnames=cols); w.writeheader(); w.writerows(rows)
 
 ##MAIN 
-def main(target=100, start_page_size=100):
+def main(target=1000, start_page_size=20):
     all_nodes = []
     seen_ids = set()
     after = None
@@ -135,7 +135,7 @@ def main(target=100, start_page_size=100):
         page_size = used_size  #para manter o tamanho funcional
 
     
-    all_nodes = all_nodes[:target]
+    all_nodes = all_nodes[:target] # removedo excesso
 
     #convertendo e salvando em 2 arquvos
     rows = normalize(all_nodes)
@@ -148,4 +148,4 @@ def main(target=100, start_page_size=100):
     print(json.dumps(rows[:3], indent=2, ensure_ascii=False))
 
 if __name__ == "__main__":
-    main(target=100, start_page_size=100)
+    main(target=1000, start_page_size=20)
