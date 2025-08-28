@@ -1,0 +1,93 @@
+(i) uma introdução simples com hipóteses informais;  
+
+(ii) a metodologia que você utilizou para responder às questões de pesquisa; 
+
+(iii) os resultados obtidos para cada uma delas;  
+
+(iv) a discussão sobre o que você 
+esperava como resultado (suas hipóteses) e os valores obtidos. 
+----------------------------------------------------------------------------------------------------------------------
+Este trabalho tem como objetivo analisar as principais características de repositórios populares do GitHub,
+ a partir de uma amostra dos 100 projetos com maior número de estrelas.
+
+(i)
+Nossa hipótese inicial são:
+RQ 01. Sistemas populares são maduros/antigos?
+Hipotese informal: Acredito que os sistemas mais populares sejam também os mais antigos, pois tiveram mais tempo para se desenvolver.
+
+RQ 02. Sistemas populares recebem muita contribuição externa?
+Hipotese informal: Projetos populares devem receber muitas contribuições externas, o que os torna mais acessíveis, conhecidos e alinhados às necessidades dos usuários.
+
+RQ 03. Sistemas populares lançam releases com frequência?
+Hipotese informal: Espera-se que os sistemas populares lancem releases frequentemente, acompanhando a evolução constante do software.
+
+RQ 04. Sistemas populares são atualizados com frequência?
+Hipotese informal: Repositórios populares devem ser atualizados com frequência para se manterem relevantes e não ficarem ultrapassados.
+
+RQ 05. Sistemas populares são escritos nas linguagens mais populares?
+Hipotese informal: Os sistemas populares devem ser escritos em linguaguem que tambem são populares, ja que isso fornece uma base maior de contribuição e ferramentas para o sistema
+
+RQ 06. Sistemas populares possuem um alto percentual de issues fechadas?
+Hipotese informal: Acredita-se que sistemas populares tenham um alto percentual de issues fechadas, pois contam com muitos colaboradores ativos.
+
+RQ7: Sistemas escritos em linguagens mais populares recebem mais contribuição externa, lançam mais releases e são atualizados com mais frequência? 
+Hipotese informal:
+
+(ii)
+Metodologia:
+A fonte dos dados foi a API GraphQL do GitHub, acessada por meio de um script próprio em Python. Para garantir conformidade com as restrições do trabalho, foram utilizadas apenas bibliotecas padrão: urllib, json, csv, datetime e pathlib.
+
+A query GraphQL foi construída para recuperar os 100 repositórios públicos com maior número de estrelas (em ordem decrescente), extraindo os seguintes campos:
+
+RQ01: createdAt
+
+RQ02: pullRequests(states: MERGED)
+
+RQ03: releases { totalCount }
+
+RQ04: updatedAt e pushedAt
+
+RQ05: primaryLanguage { name }
+
+RQ06: issues e closedIssues
+
+Além disso, foram coletados os atributos id, name, owner, url e stargazerCount, para fins de identificação e análise de popularidade.
+
+O tratamento dos dados seguiu o seguinte fluxo:
+
+Conversão de datas ISO para dias/anos.
+
+Cálculo de medianas para cada métrica.
+
+Normalização dos dados em estruturas JSON e CSV.
+
+Geração de tabelas e gráficos para visualização.
+----------------------------------------------------------------------------------------------------------------------
+
+
+
+
+template:
+
+Relatorio Final:
+
+Relatorio Tecnico: analise de repositorios populares:
+
+objetivo:
+
+linguaguem usada:
+
+dependencias:
+
+apis ultilizadas:
+
+Metodologia:
+
+-
+-
+-
+
+resultados(inclua os graficso do ql):
+
+conclusões:
+
