@@ -147,5 +147,8 @@ def main(target=1000, start_page_size=20):
    # teste
     print(json.dumps(rows[:3], indent=2, ensure_ascii=False))
 
+    #Q7
+    # top100 =
+
 if __name__ == "__main__":
     main(target=1000, start_page_size=20)
