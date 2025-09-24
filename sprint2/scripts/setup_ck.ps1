@@ -15,21 +15,97 @@ if (-not $target) {
 
 Write-Host "[CK] Target: $target"
 
-# Verificações básicas
-function Assert-Tool($name, $check) {
-  try { iex $check | Out-Null } catch { throw "Ferramenta necessária não encontrada: $name" }
+# Helpers: tentar localizar ferramentas comuns e ajustar PATH da sessão
+function Add-ToPathIfExists {
+  param([string]$path)
+  if ([string]::IsNullOrWhiteSpace($path)) { return $false }
+  if (Test-Path -LiteralPath $path) {
+    if (-not ($env:Path -split ';' | Where-Object { $_ -eq $path })) {
+      $env:Path = "$path;" + $env:Path
+    }
+    return $true
+  }
+  return $false
 }
-Assert-Tool 'git' 'git --version'
-Assert-Tool 'mvn' 'mvn -v'
-Assert-Tool 'java' 'java -version'
+
+function Ensure-Tool {
+  param(
+    [string]$name,
+    [string]$exe,
+    [string[]]$candidateDirs
+  )
+  $found = $false
+  try {
+    $null = Get-Command $exe -ErrorAction Stop
+    $found = $true
+  } catch {
+    foreach ($d in $candidateDirs) {
+      if (Add-ToPathIfExists $d) {
+        try { $null = Get-Command $exe -ErrorAction Stop; $found = $true; break } catch { }
+      }
+    }
+  }
+  if (-not $found) { throw "Ferramenta necessária não encontrada: $name ($exe)" }
+}
+
+# Candidatos comuns
+$gitCandidates = @(
+  "$env:ProgramFiles\Git\cmd",
+  "$env:ProgramFiles\Git\bin",
+  "${env:ProgramFiles(x86)}\Git\cmd",
+  "${env:ProgramFiles(x86)}\Git\bin"
+)
+$mvnCandidates = @(
+  "$env:ProgramData\chocolatey\bin",
+  "$env:ProgramData\chocolatey\lib\maven\apache-maven-3.9.11\bin",
+  "$env:ProgramFiles\Apache\maven\bin"
+)
+$javaCandidates = @()
+if ($env:JAVA_HOME) { $javaCandidates += (Join-Path $env:JAVA_HOME 'bin') }
+$javaCandidates += @(
+  "$env:ProgramFiles\Eclipse Adoptium\jdk-17.0.16.8-hotspot\bin",
+  "$env:ProgramFiles\Eclipse Adoptium\jdk-17\bin",
+  "$env:ProgramFiles\Java\jdk-17\bin",
+  "$env:ProgramFiles\Java\jdk-11\bin"
+)
+
+Ensure-Tool -name 'git' -exe 'git' -candidateDirs $gitCandidates
+Ensure-Tool -name 'maven' -exe 'mvn' -candidateDirs $mvnCandidates
+Ensure-Tool -name 'java' -exe 'java' -candidateDirs $javaCandidates
+
+# Se já houver um JAR válido no diretório alvo e não for Force, reutilize
+$existingJar = Get-ChildItem -Path $target -Filter '*jar-with-dependencies.jar' -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($existingJar -and (-not $Force.IsPresent)) {
+  Write-Host "[CK] JAR já encontrado em $($existingJar.FullName). Usando existente (use -Force para rebuild)."
+  # Atualiza manifesto simples e sai
+  $manifest = @{
+    repo = $RepoUrl
+    built_at = (Get-Date).ToString('s')
+    jar = (Split-Path -Leaf $existingJar.FullName)
+    reused = $true
+  }
+  $manifest | ConvertTo-Json | Set-Content (Join-Path $target 'ck_build.json')
+  exit 0
+}
 
 $srcDir = Join-Path $target 'src'
-# Em PowerShell, use -and dentro de parênteses na condição
-if ((Test-Path -LiteralPath $srcDir) -and (-not $Force.IsPresent)) {
-  Write-Host "[CK] Repositório já existe em $srcDir. Use -Force para atualizar."
-} else {
+
+# Se src existe mas não contém pom.xml e não for Force, vamos forçar reclone
+$needsClone = $true
+if (Test-Path -LiteralPath $srcDir) {
+  if (Test-Path -LiteralPath (Join-Path $srcDir 'pom.xml')) {
+    $needsClone = $false
+    if ($Force.IsPresent) { $needsClone = $true }
+  } else {
+    $needsClone = $true
+  }
+}
+if ($needsClone) {
   if (Test-Path -LiteralPath $srcDir) { Remove-Item -Recurse -Force -LiteralPath $srcDir }
+  Write-Host "[CK] Clonando repositório CK em $srcDir ..."
   git clone --depth=1 $RepoUrl $srcDir
+} else {
+  Write-Host "[CK] Repositório já existe em $srcDir. (Use -Force para atualizar)"
 }
 
 Push-Location $srcDir

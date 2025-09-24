@@ -1,0 +1,17 @@
+{
+  // Reduce background noise and hangs: exclude streaming temp clones from Java and watchers
+  "files.watcherExclude": {
+    "**/sprint2/data/_stream_tmp/**": true
+  },
+  "search.exclude": {
+    "sprint2/data/_stream_tmp": true
+  },
+  "java.import.excludeFolders": [
+    "sprint2/data/_stream_tmp",
+    "**/.git",
+    "**/build",
+    "**/target",
+    "**/.gradle",
+    "**/node_modules"
+  ]
+}

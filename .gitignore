@@ -1,0 +1,33 @@
+# Python cache and artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.log
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+
+# VS Code local settings (uncomment to ignore local settings)
+# .vscode/
+
+# Project-generated temp data
+sprint2/data/_stream_tmp/
+sprint2/data/raw_cloc/
+sprint2/data/repos/
+
+# Processed repair/debug artifacts (keep only canonical CSVs and plots)
+sprint2/data/processed/cloc_summary_*repair*.csv
+sprint2/data/processed/cloc_summary_debug*.csv
+sprint2/data/processed/ck_summary_*repair*.csv
+sprint2/data/processed/_suspect_*.csv
+
+# CK logs (if any)
+sprint2/tools/ck/*.log

@@ -8,19 +8,23 @@ sprint2/
     ck/                           # CK construído (JARs) 
   scripts/
     fetch_repos_graphql.py        # Coleta top-N Java via GraphQL
-    clone_repos.py                # Clone paralelo com suporte a long paths
-    run_cloc.py                   # cloc em lote + CSV agregado
-    run_cloc_one.py               # cloc por repositório (CSV simples)
+    analyze_rqs.py                # consolida dados e calcula correlações (plots opcionais)
+    process_streaming.py          # processamento streaming: clona, mede, salva sumários e apaga o repo
+    process_local.py              # processa um repositório já baixado (sem clonar)
+    merge_summaries.py            # une shards/repairs e deduplica por repo (canônicos)
+    check_missing.py              # identifica faltantes e gera CSV para reprocesso
+    review_outputs.py             # resumo rápido de saídas e verificação de plots
     setup_ck.ps1                  # Script para obter/compilar CK
     setup_cloc.ps1                # Script para instalar cloc
   data/
-    repos/                        # Repositórios clonados: <owner>/<repo>
     repos_list.csv                # Lista dos repositórios coletados (GraphQL)
-    raw_ck/                       # Saídas brutas do CK (métricas de qualidade)
-    raw_cloc/                     # Saídas brutas do cloc (LOC, comentários)
-      00-Evan__shattered-pixel-dungeon.all_langs.json
-    processed/                    # Dados consolidados para análise
-      00-Evan_cloc.csv            # Exemplo de CSV individual (cloc)
+    _stream_tmp/                  # Pasta temporária para o modo streaming (ignorada pelo git)
+    processed/                    # Dados consolidados para análise (apenas artefatos canônicos)
+      cloc_summary.csv
+      ck_summary.csv
+      analysis_summary.csv
+      correlations.csv
+      plots/
 ```
 
 ## Requisitos de Software
@@ -99,56 +103,53 @@ python sprint2\scripts\fetch_repos_graphql.py --max 1000 --out sprint2\data\repo
 
 O arquivo `sprint2/data/repos_list.csv` conterá: repo, url, stars, created_at, releases, age_years.
 
-## Clonar os repositórios (com suporte a caminhos longos)
-Para clonar os repositórios listados no CSV em paralelo:
-
-```powershell
-# clona para sprint2/data/repos/<owner>/<repo>
-python sprint2\scripts\clone_repos.py --csv sprint2\data\repos_list.csv --out sprint2\data\repos --workers 6
-```
-
-Observações (Windows):
-- O script força `git -c core.longpaths=true` por invocação para mitigar erros de “Filename too long”.
-- Opcionalmente, habilite caminhos longos no sistema e no Git para uso geral:
-  - Registro do Windows (requer admin): HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled = 1
-  - Git (requer admin para nível system): `git config --system core.longpaths true`
-
-As falhas de clone são registradas em `sprint2/data/clone_failures.log`.
-
-## Medir tamanho (LOC e comentários) com cloc
-Instale o cloc (veja acima). Depois, rode em lote para todos os repositórios clonados:
-
-```powershell
-python sprint2\scripts\run_cloc.py --repos_dir sprint2\data\repos --out_json_dir sprint2\data\raw_cloc --out_csv sprint2\data\processed\cloc_summary.csv --workers 6
-```
-
-Saídas:
-- JSON por repositório em `sprint2/data/raw_cloc/<owner>__<repo>.json`
-- CSV agregado em `sprint2/data/processed/cloc_summary.csv` com colunas: repo, files, code, comment, blank
-
-Gerar CSV para um repositório específico (ex.: 00-Evan/shattered-pixel-dungeon):
-```powershell
-python sprint2\scripts\run_cloc_one.py --repo_dir sprint2\data\repos\00-Evan\shattered-pixel-dungeon --out_csv sprint2\data\processed\00-Evan_cloc.csv --name 00-Evan/shattered-pixel-dungeon
-```
-
-Exemplo de saída (já gerado):
-```
-repo,files,code,comment,blank
-00-Evan/shattered-pixel-dungeon,1554,273423,33108,57435
-```
-
-## Métricas de qualidade (CK)
-O CK já é obtido/compilado via `setup_ck.ps1`. Próximo passo: automatizar a execução do JAR do CK para cada repositório e sumarizar CBO, DIT e LCOM por repositório (os CSVs do CK são gerados por nível — classe/método/etc.).
-
-Notas:
-- O JAR ficará em `sprint2/tools/ck/ck-<versao>-jar-with-dependencies.jar`.
-- Em breve será adicionado um script para executar o CK em lote e consolidar as métricas por repositório.
-
 ## Artefatos de dados esperados
 - `sprint2/data/repos_list.csv` — lista dos 1.000 repositórios com: repo, url, stars, created_at, releases, age_years
 - `sprint2/data/processed/cloc_summary.csv` — LOC e comentários por repositório (totais)
-- `sprint2/data/raw_cloc/*.json` — saídas brutas do cloc por repositório
-- `sprint2/data/raw_ck/*.csv` — saídas do CK (por nível); será sumarizado para CBO, DIT, LCOM por repositório
+- `sprint2/data/processed/ck_summary.csv` — resumo por repo de CBO/DIT/LCOM
+- `sprint2/data/processed/analysis_summary.csv` — tabela mesclada para análise
+- `sprint2/data/processed/correlations.csv` — correlações (Spearman e Pearson)
+- `sprint2/data/processed/plots/*.png` — visualizações (bônus)
+
+Limpeza e versionamento:
+- Apenas os artefatos canônicos ficam versionados em `processed/` (as quatro CSVs + `plots/`).
+- Artefatos temporários/diagnósticos (ex.: `cloc_summary_*repair*.csv`, `cloc_summary_debug*.csv`, suspeitos) são ignorados via `.gitignore`.
+- A pasta temporária `data/_stream_tmp/` é ignorada e removida após cada execução streaming.
+
+## Modo Streaming (não armazena repositórios)
+Fluxo recomendado: para cada repo, o script clona shallow, mede CLOC e CK, grava os sumários e apaga a pasta.
+
+```powershell
+# Processa em modo streaming os primeiros 100 repositórios da lista
+python sprint2\scripts\process_streaming.py `
+  --csv sprint2\data\repos_list.csv `
+  --work_dir sprint2\data\_stream_tmp `
+  --out_dir sprint2\data\processed `
+  --max 100 `
+  --ck_jar sprint2\tools\ck\ck-0.7.1-SNAPSHOT-jar-with-dependencies.jar
+
+# Opcional: rodar apenas um subconjunto por regex (ex.: apenas repos do owner 'apache')
+python sprint2\scripts\process_streaming.py --filter_regex "^apache/" --max 50
+
+# Dica (Windows): se git, cloc ou java não estiverem no PATH, informe explicitamente
+python sprint2\scripts\process_streaming.py `
+  --csv sprint2\data\repos_list.csv `
+  --max 5 `
+  --work_dir sprint2\data\_stream_tmp `
+  --out_dir sprint2\data\processed `
+  --git_exe "C:\\Program Files\\Git\\bin\\git.exe" `
+  --cloc_exe "C:\\ProgramData\\chocolatey\\bin\\cloc.exe" `
+  --java_exe "C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.16.8-hotspot\\bin\\java.exe"
+```
+
+Saídas (mesmas dos modos anteriores, porém sem salvar JSONs/CSVs brutos por repo):
+- `sprint2/data/processed/cloc_summary.csv`
+- `sprint2/data/processed/ck_summary.csv`
+
+Notas técnicas (robustez do CLOC/CK):
+- O `process_streaming.py` implementa estratégias de fallback para o CLOC: varredura do working tree, modo `--vcs=git`, lista de arquivos `.java`, varredura por sub-raiz (match `--match-f=.java`), passagem Java-only pela árvore completa e, para repositórios muito grandes, agregação em blocos (chunked list-file) — mitigando erros de I/O do Perl em árvores enormes.
+- Para CK, o script usa JAR com caminho absoluto, flags de memória da JVM e caminho(s) de fonte de fallback (ex.: `src/main/java`).
+- Flags úteis: `--skip_cloc`, `--skip_ck`, `--workers`, `--cloc_extended`, `--keep_temp` (para inspeção pontual).
 
 ## Perguntas de pesquisa (RQs) e como medir
 - RQ01 Popularidade vs Qualidade: usar `stars` versus CBO/DIT/LCOM
@@ -158,6 +159,15 @@ Notas:
 
 Para cada RQ, sumarizar por repositório usando medidas de tendência central (mediana, média) e dispersão (desvio padrão), e discutir achados versus hipóteses.
 
+Gere as tabelas e correlações com:
+
+```powershell
+# Após gerar repos_list.csv, cloc_summary.csv e ck_summary.csv
+python sprint2\scripts\analyze_rqs.py --plots
+```
+
+Os gráficos serão salvos em `sprint2/data/processed/plots/*.png`.
+
 ## Troubleshooting
 - Erro “Filename too long” (Windows): habilite caminhos longos (ver seção de clone) e use o script de clone fornecido, que já força `core.longpaths=true` por invocação.
 - `cloc` falha por falta de `unzip`: nossos scripts usam varredura do working tree (evita dependências externas). Garanta que o `cloc` está instalado e acessível no PATH.
@@ -166,6 +176,8 @@ Para cada RQ, sumarizar por repositório usando medidas de tendência central (m
 ## Status atual (resumo)
 - Lista dos 1.000 repositórios: ok (GraphQL)
 - Clone em paralelo com suporte a caminhos longos: ok
-- cloc em repositório individual (ex.: 00-Evan): ok (`00-Evan_cloc.csv` gerado)
-- cloc em lote e consolidação (`cloc_summary.csv`): pendente de execução
-- CK (CBO, DIT, LCOM) e sumarização por repositório: pendente (script em desenvolvimento)
+- Coleta e processamento streaming (CLOC e CK) → `cloc_summary.csv` e `ck_summary.csv`: ok
+- Merge/dedup (canônicos) → `merge_summaries.py`: ok
+- Análise RQs + correlações + gráficos → `analyze_rqs.py`: ok
+
+Observação: após múltiplas rodadas de validação e reparo direcionado, restou uma fração pequena (~1%) de casos anômalos tolerados (p.ex., `CK>0` e `CLOC==0` em árvores peculiares). Esses casos não alteram as conclusões principais e podem ser revisitados com inspeções pontuais, se necessário.
